@@ -13,40 +13,53 @@
  *
  * You may need to implement the following directives
 
-if (!('IE8' in  Prototype.Browser)) {
+ if (!('IE8' in  Prototype.Browser)) {
   Prototype.Browser.IEVersion = parseFloat(navigator.appVersion.split(';')[1].strip().split(' ')[1]);
   Prototype.Browser.IE6 =  Prototype.Browser.IEVersion == 6;
   Prototype.Browser.IE7 =  Prototype.Browser.IEVersion == 7;
   Prototype.Browser.IE8 =  Prototype.Browser.IEVersion == 8;
 }
  */
+;
 (function () {
 
-    var separator = '","';
-    var linefeed = '"\r\n"';
+    var defaultOptions = {
+        separator: ',',
+        linefeed:  '\r\n',
+        header:    []
+    };
 
     var elementMatchers = {
         'HTMLElements': /^(?:TABLE)$/
     };
 
-    Element.addMethods({exportTableAsCSV: function (element) {
+    Element.addMethods({exportTableAsCSV: function (element, options) {
         element = $(element);
+
+        options = Object.extend(defaultOptions, options || {});
+
+        options.separator = '"' + options.separator + '"';
+        options.linefeed  = '"' + options.linefeed + '"';
 
         if (elementMatchers['HTMLElements'].test(element.tagName)) {
             var tmpSeparator = String.fromCharCode(11), // vertical tab character
-                tmpLinefeed = String.fromCharCode(0);   // null character
+                tmpLinefeed = String.fromCharCode(0),   // null character
+                csvData = '', headerSelector = '';
 
-            var csvData = '"' + element.getElementsBySelector('tr:has(td)').collect(function (row, i) {
+            if (options.header.length > 0)
+                csvData = options.header.join(options.separator) + options.linefeed;
+            else
+                headerSelector = 'tr:has(th),';
 
-                return row.getElementsBySelector('td').collect(function (col, j) {
+            csvData += '"' + element.select(headerSelector + 'tr:has(td)').collect(function (row, i) {
+                return row.select('th,td').collect(function (col, j) {
                     var text = col.down("a") && col.down("a").length > 0 ? col.down("a")[0].innerHTML : col.innerHTML; // extract data from td content
-                    return text.replace(/°/g, " ").replace(/"/g, '""'); // escape and replace
+                    return text.replace(/°/g, " ").replace(/"/g, '""').stripTags().unescapeHTML(); // escape and replace
                 }).join(tmpSeparator);
+            }).join(options.linefeed)
 
-            }).join(linefeed)
-
-                .split(tmpLinefeed).join(linefeed)
-                .split(tmpSeparator).join(separator) + '"';
+                .split(tmpLinefeed).join(options.linefeed)
+                .split(tmpSeparator).join(options.separator) + '"';
 
             if (Prototype.Browser.IE6 || Prototype.Browser.IE7 || Prototype.Browser.IE8) {
                 var popup = window.open('', 'csv', '');
